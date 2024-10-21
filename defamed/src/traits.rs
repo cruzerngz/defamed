@@ -17,6 +17,7 @@ pub trait ToMacroPattern {
     fn to_macro_pattern(&self) -> Option<pm2::TokenStream>;
 
     /// Create a function call pattern.
+    /// Any additional path is prefixed to the symbol.
     ///
     /// ```ignore
     /// macro_rules! some_macro (
@@ -27,7 +28,7 @@ pub trait ToMacroPattern {
     ///     }
     /// )
     /// ```
-    fn to_func_call_pattern(&self) -> pm2::TokenStream;
+    fn to_func_call_pattern(&self, path_prefix: Option<pm2::TokenStream>) -> pm2::TokenStream;
 }
 
 /// Strip matching attributes from a type.

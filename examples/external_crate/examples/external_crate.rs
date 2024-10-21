@@ -15,5 +15,26 @@ fn main() {
 
     let r_1 = defamed_test_lib::some_root_function("base", None);
     let r_2 = defamed_test_lib::some_root_function!("base");
+
     assert_eq!(r_1, r_2);
+
+    use_extern_struct_macro();
+}
+
+/// Public struct macro with const default values
+fn use_extern_struct_macro() {
+    let item = defamed_test_lib::DefaultStruct! {
+        index: 1,
+        ..
+    };
+
+    let reference = defamed_test_lib::DefaultStruct {
+        index: 1,
+        offset: 0,
+        inner: defamed_test_lib::DEFAULT_SLICE,
+    };
+
+    assert_eq!(item.index, reference.index);
+    assert_eq!(item.offset, reference.offset);
+    assert_eq!(item.inner, reference.inner);
 }

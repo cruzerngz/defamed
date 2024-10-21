@@ -46,13 +46,15 @@ pub mod inner {
     }
 }
 
+pub const DEFAULT_SLICE: &[u8] = &[];
+
 /// Some struct definition
 #[defamed::defamed(crate)]
 pub struct DefaultStruct<'a> {
     pub index: usize,
     #[def]
     pub offset: usize,
-    #[def((&[]))]
+    #[def(const DEFAULT_SLICE)]
     pub inner: &'a [u8],
 }
 
@@ -85,37 +87,24 @@ fn complex_function(
     }
 }
 
-// #[defamed::defamed]
-// fn all_default(
-//     #[def(1)] a: i32,
-//     #[def(2)] b: i32,
-//     #[def(3)] c: i32,
-//     // #[def(4)] d: i32,
-//     // #[def(5)] e: i32,
-// ) -> i32 {
-//     a + b + c
-// }
+pub mod using_constants {
+    /// Const in use must be at least as visible as the item using it
+    pub mod consts {
+        pub const SOME_DEFAULT: u32 = 4096;
 
-// generate a function with 10 positional arguments and 5 default arguments
-// defamed::defamed! {
-// #[defamed::defamed(crate)]
-// pub fn many_args(
-//     #[def(1)] a: i32,
-//     #[def(2)] b: i32,
-//     #[def(3)] c: i32,
-//     #[def(4)] d: i32,
-//     #[def(5)] e: i32,
-//     #[def(6)] f: i32,
-//     #[def(7)] g: i32,
-//     // #[def(8)] h: i32,
-//     // #[def(9)] i: i32,
-//     // #[def(10)] j: i32,
-//     // #[def(11)] k: i32,
-//     // #[def(12)] l: i32,
-//     // #[def(13)] m: i32,
-//     // #[def(14)] n: i32,
-//     // #[def(15)] o: i32,
-// ) -> i32 {
-//     a + b + c + d + e + f + g
-// }
-// // }
+        #[defamed::defamed(using_constants::consts)]
+        pub struct Item(pub usize);
+    }
+
+    /// Path to item must be present for items with default constants
+    #[defamed::defamed(using_constants)]
+    #[derive(Debug, PartialEq)]
+    pub struct WithConsts {
+        pub offset: u32,
+
+        /// A `const` keyword identifies constants
+        /// The path provided to the constant must be relative to the function using it
+        #[def(const consts::SOME_DEFAULT)]
+        pub value: u32,
+    }
+}

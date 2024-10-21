@@ -86,6 +86,20 @@ pub fn item_fn(input: syn::ItemFn, fn_path: Option<syn::Path>) -> ProcOutput {
         Err(e) => return e.to_compile_error().into(),
     };
 
+    if params
+        .params
+        .iter()
+        .any(|p| matches!(p.default_value, ParamAttr::Ident(_)))
+        && fn_path.is_none()
+    {
+        return syn::Error::new(
+            sig.ident.span(),
+            "Functions with const default values must provide a path to itself",
+        )
+        .to_compile_error()
+        .into();
+    }
+
     if let Some(invalid) = params.first_invalid_param() {
         return syn::Error::new(
             invalid.inner_span(),
@@ -98,7 +112,10 @@ pub fn item_fn(input: syn::ItemFn, fn_path: Option<syn::Path>) -> ProcOutput {
     let params_inner = params.params.clone();
     let (positional, default) = {
         let partition = params_inner.iter().enumerate().find_map(|(idx, f)| {
-            if matches!(f.default_value, ParamAttr::Default | ParamAttr::Value(_)) {
+            if matches!(
+                f.default_value,
+                ParamAttr::Default | ParamAttr::Expr(_) | ParamAttr::Ident(_)
+            ) {
                 Some(idx)
             } else {
                 None
@@ -131,7 +148,7 @@ pub fn item_fn(input: syn::ItemFn, fn_path: Option<syn::Path>) -> ProcOutput {
     //     .filter(|a| a.path().is_ident("doc"))
     //     .collect::<Vec<_>>();
 
-    let generated = macro_gen::generate_func_macro(
+    let generated = macro_gen::generate_item_macro(
         vis.clone(),
         // doc_attrs,
         // package_name,
@@ -251,6 +268,20 @@ fn item_struct_struct(
         Err(e) => return e.to_compile_error().into(),
     };
 
+    if n_fields
+        .fields
+        .iter()
+        .any(|f| matches!(f.default_value, ParamAttr::Ident(_)))
+        && s_path.is_none()
+    {
+        return syn::Error::new(
+            ident.span(),
+            "Structs with const default fields must include a path to itself",
+        )
+        .to_compile_error()
+        .into();
+    }
+
     if let Some(invalid) = n_fields.first_invalid() {
         return syn::Error::new(
             invalid.ident.span(),
@@ -265,7 +296,10 @@ fn item_struct_struct(
 
     let (positional, defaults) = {
         let partition = fields_inner.iter().enumerate().find_map(|(idx, f)| {
-            if matches!(f.default_value, ParamAttr::Default | ParamAttr::Value(_)) {
+            if matches!(
+                f.default_value,
+                ParamAttr::Default | ParamAttr::Expr(_) | ParamAttr::Ident(_)
+            ) {
                 Some(idx)
             } else {
                 None
@@ -305,7 +339,7 @@ fn item_struct_struct(
         })
         .collect::<Vec<_>>();
 
-    let generated = macro_gen::generate_func_macro(
+    let generated = macro_gen::generate_item_macro(
         vis.clone(),
         s_path.clone(),
         ident.clone(),
@@ -393,6 +427,20 @@ fn item_struct_tuple(
         Err(e) => return e.to_compile_error().into(),
     };
 
+    if un_fields
+        .fields
+        .iter()
+        .any(|f| matches!(f.default_value, ParamAttr::Ident(_)))
+        && s_path.is_none()
+    {
+        return syn::Error::new(
+            ident.span(),
+            "Tuples with const default elements must include a path to itself",
+        )
+        .to_compile_error()
+        .into();
+    }
+
     if let Some(invalid) = un_fields.first_invalid() {
         return syn::Error::new(
             invalid.ident.span(),
@@ -407,7 +455,10 @@ fn item_struct_tuple(
 
     let (positional, defaults) = {
         let partition = fields_inner.iter().enumerate().find_map(|(idx, f)| {
-            if matches!(f.default_value, ParamAttr::Default | ParamAttr::Value(_)) {
+            if matches!(
+                f.default_value,
+                ParamAttr::Default | ParamAttr::Expr(_) | ParamAttr::Ident(_)
+            ) {
                 Some(idx)
             } else {
                 None
@@ -425,7 +476,7 @@ fn item_struct_tuple(
 
     let permuted = crate::permute::permute_tuple_struct(positional, defaults);
 
-    let generated = macro_gen::generate_func_macro(
+    let generated = macro_gen::generate_item_macro(
         vis.clone(),
         s_path.clone(),
         ident.clone(),

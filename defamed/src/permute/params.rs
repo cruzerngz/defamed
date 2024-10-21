@@ -57,7 +57,8 @@ impl Debug for ParamAttr {
         match self {
             Self::None => write!(f, "None"),
             Self::Default => write!(f, "Default"),
-            Self::Value(arg0) => write!(f, "Value({})", arg0.to_token_stream()),
+            Self::Expr(arg0) => write!(f, "Value({})", arg0.to_token_stream()),
+            Self::Ident(arg0) => write!(f, "Ident({})", arg0.to_token_stream()),
         }
     }
 }
@@ -85,22 +86,23 @@ impl ToMacroPattern for PermutedItem<FunctionParam> {
         }
     }
 
-    fn to_func_call_pattern(&self) -> proc_macro2::TokenStream {
+    fn to_func_call_pattern(
+        &self,
+        path_prefix: Option<proc_macro2::TokenStream>,
+    ) -> proc_macro2::TokenStream {
         match self {
             PermutedItem::Positional(FunctionParam { pat, .. })
             | PermutedItem::Named(FunctionParam { pat, .. }) => {
                 let val = syn::Ident::new(&format!("{}_val", pat.to_token_stream()), pat.span());
                 quote! {$#val}
             }
-            // PermutedItem::Named(FunctionParam { pat, .. }) =>{
-
-            // },
             PermutedItem::Default(FunctionParam { default_value, .. }) => {
                 //
                 match default_value {
                     ParamAttr::None => unimplemented!("default value must be present"),
                     ParamAttr::Default => quote! {core::default::Default::default()},
-                    ParamAttr::Value(v) => quote! {#v},
+                    ParamAttr::Expr(v) => quote! {#v},
+                    ParamAttr::Ident(i) => quote! {#path_prefix #i},
                 }
             }
         }
@@ -115,7 +117,8 @@ impl ToDocInfo for FunctionParam {
             default_value: match &self.default_value {
                 ParamAttr::None => None,
                 ParamAttr::Default => Some("Default::default()".to_string()),
-                ParamAttr::Value(expr) => Some(expr.to_token_stream().to_string()),
+                ParamAttr::Expr(expr) => Some(expr.to_token_stream().to_string()),
+                ParamAttr::Ident(ident) => Some(ident.to_token_stream().to_string()),
             },
         }
     }

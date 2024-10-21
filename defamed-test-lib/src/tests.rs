@@ -57,6 +57,19 @@ fn test_default_tuple_struct() {
     assert_eq!(c, DefaultTupleStruct(2, 4, 'f'));
 }
 
+/// This test runs code that is identically defined in a doctest in README.md
+///
+/// Test const defaults from doctest as doctests do not resolve `crate` paths
+/// in the same way as the main crate.
+#[test]
+fn test_doctest_clone() {
+    let reference = using_constants::WithConsts {
+        offset: 404,
+        value: 4096,
+    };
+    assert_eq!(reference, using_constants::WithConsts! { offset: 404, .. });
+}
+
 #[test]
 fn test_all_default() {
     // let a = all_default!();

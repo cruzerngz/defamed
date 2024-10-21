@@ -106,12 +106,15 @@ impl ToMacroPattern for PermutedItem<StructField> {
 
             Self::Default(StructField { default_value, .. }) => match default_value {
                 ParamAttr::None => unimplemented!("default value must be present"),
-                ParamAttr::Default | ParamAttr::Value(_) => None,
+                ParamAttr::Default | ParamAttr::Expr(_) | ParamAttr::Ident(_) => None,
             },
         }
     }
 
-    fn to_func_call_pattern(&self) -> proc_macro2::TokenStream {
+    fn to_func_call_pattern(
+        &self,
+        path_prefix: Option<proc_macro2::TokenStream>,
+    ) -> proc_macro2::TokenStream {
         if self.inner().dot_dot {
             return quote! {};
         }
@@ -141,8 +144,11 @@ impl ToMacroPattern for PermutedItem<StructField> {
                 (ParamAttr::None, _) => unimplemented!("default value must be present"),
                 (ParamAttr::Default, true) => quote! {core::default::Default::default()},
                 (ParamAttr::Default, false) => quote! {#ident: core::default::Default::default()},
-                (ParamAttr::Value(expr), true) => quote! {#expr},
-                (ParamAttr::Value(expr), false) => quote! {#ident: #expr},
+                (ParamAttr::Expr(expr), true) => quote! {#expr},
+                (ParamAttr::Expr(expr), false) => quote! {#ident: #expr},
+                // TODO: needs checking
+                (ParamAttr::Ident(path), true) => quote! {#path_prefix #path},
+                (ParamAttr::Ident(path), false) => quote! {#ident: #path_prefix #path},
             },
         }
     }
@@ -197,7 +203,8 @@ impl ToDocInfo for StructField {
             default_value: match &self.default_value {
                 ParamAttr::None => None,
                 ParamAttr::Default => Some("Default::default()".to_string()),
-                ParamAttr::Value(expr) => Some(expr.to_token_stream().to_string()),
+                ParamAttr::Expr(expr) => Some(expr.to_token_stream().to_string()),
+                ParamAttr::Ident(ident) => Some(ident.to_token_stream().to_string()),
             },
         }
     }
@@ -359,7 +366,7 @@ mod tests {
         assert!(inner.len() == 3);
         assert!(matches!(inner[0].default_value, ParamAttr::None));
         assert!(matches!(inner[1].default_value, ParamAttr::Default));
-        assert!(matches!(inner[2].default_value, ParamAttr::Value(_)));
+        assert!(matches!(inner[2].default_value, ParamAttr::Expr(_)));
     }
 
     #[test]
@@ -384,7 +391,7 @@ mod tests {
         assert!(inner.len() == 3);
         assert!(matches!(inner[0].default_value, ParamAttr::None));
         assert!(matches!(inner[1].default_value, ParamAttr::Default));
-        assert!(matches!(inner[2].default_value, ParamAttr::Value(_)));
+        assert!(matches!(inner[2].default_value, ParamAttr::Expr(_)));
     }
 
     #[test]

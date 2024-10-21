@@ -31,7 +31,7 @@ fn complex_function(
 
     match divide_result_by {
         Some(div) => intermediate / div,
-        None => intermediate,
+        None => intermediate
     }
 }
 
@@ -46,7 +46,7 @@ Struct macros can be used in-place of the [builder pattern](https://crates.io/cr
 ```rust
 /// A struct that does not fully implement core::default::Default
 #[defamed::defamed]
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq)]
 struct PartialDefault<'a> {
     pub inner: &'a [u8],
 
@@ -78,6 +78,7 @@ assert_eq!(reference, ts_b);
 
 ## Features
 - Named and positional parameters in any order à la [Python](https://docs.python.org/3/tutorial/controlflow.html#more-on-defining-functions)
+- Define defaults as literals, constants or types implementing `Default`
 - Generated macros live in the same path as the associated item
 - Export macros for use in other crates
 - With the heavy lifting done at compile time
@@ -98,6 +99,61 @@ assert_eq!(reference, ts_b);
 #### [nade](https://docs.rs/nade)
 - macro requires explicit import to call underlying function
 
+## Default parameters
+Default parameters can be defined in 3 ways:
+- as a type implementing `Default`
+- as a literal expression
+- as a constant
+
+> [!NOTE]
+> This syntax applies to all supported items.
+
+### Default trait and literal expressions
+```rust
+#[defamed::defamed]
+fn fn_with_defaults(
+    #[def] input: usize,
+    #[def(3)] literal: usize,
+) -> usize {
+    input << literal
+}
+
+assert_eq!(0, fn_with_defaults!());
+assert_eq!(8, fn_with_defaults!(1));
+assert_eq!(4, fn_with_defaults!(1, 2));
+assert_eq!(32, fn_with_defaults!(literal = 5, input = 1));
+```
+
+### Constants
+```rust ,ignore
+pub mod using_constants {
+    /// Const in use must be at least as visible as the item using it
+    pub mod consts {
+        pub const SOME_DEFAULT: u32 = 4096;
+
+        #[defamed::defamed(using_constants::consts)]
+        pub struct Item(pub usize);
+    }
+
+    /// Path to item must be present for items with default constants
+    #[defamed::defamed(using_constants)]
+    #[derive(Debug, PartialEq)]
+    pub struct WithConsts {
+        pub offset: u32,
+
+        /// A `const` keyword identifies constants
+        /// Paths are relative to the item using the constant
+        #[def(const consts::SOME_DEFAULT)]
+        pub value: u32,
+    }
+}
+
+let reference = using_constants::WithConsts {
+    offset: 404,
+    value: 4096,
+};
+assert_eq!(reference, using_constants::WithConsts! { offset: 404, .. });
+```
 
 ## Parameter passing
 The macro accepts parameters in any permutation as long as the following conditions are met:

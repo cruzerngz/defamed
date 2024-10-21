@@ -19,7 +19,10 @@ pub enum ParamAttr {
     /// Use default trait for initialization
     Default,
     /// Use const expr for initialization
-    Value(syn::Expr),
+    Expr(syn::Expr),
+
+    /// Use a const identifier for initialization
+    Ident(syn::Path),
 }
 
 /// A single permuted item
@@ -76,7 +79,7 @@ impl ParamAttr {
         match meta {
             syn::Meta::Path(_) => Ok(Self::Default),
             syn::Meta::List(ml) => {
-                let l_span = ml.span();
+                // let l_span = ml.span();
 
                 let list_items = ml.tokens.into_iter().collect::<Vec<_>>();
 
@@ -85,32 +88,34 @@ impl ParamAttr {
                         let item = list_items.first().unwrap();
                         let expr = syn::parse2::<syn::Expr>(item.to_token_stream())?;
 
-                        Ok(Self::Value(expr))
+                        Ok(Self::Expr(expr))
                     }
-                    2 => {
-                        let (first, second) = {
+                    _ => {
+                        let (first, rest) = {
                             let mut iter = list_items.into_iter();
-                            (iter.next().unwrap(), iter.next().unwrap())
+                            (
+                                iter.next().unwrap(),
+                                iter.collect::<proc_macro2::TokenStream>(),
+                            )
                         };
 
                         if syn::parse2::<syn::Token![const]>(first.to_token_stream()).is_err() {
                             let e = syn::Error::new(
                                 first.span(),
-                                "expected `const` keyword before identifier",
+                                "expected `const` keyword before path to identifier",
                             );
 
                             return Err(e);
                         }
 
-                        let expr = syn::parse2::<syn::Expr>(second.to_token_stream())?;
-                        Ok(Self::Value(expr))
-                    }
-                    other => {
-                        let e = syn::Error::new(
-                            l_span,
-                            format!("expected 1 or 2 items in metalist, found {}", other),
-                        );
-                        Err(e)
+                        let path = syn::parse2::<syn::Path>(rest)?;
+                        Ok(Self::Ident(path))
+
+                        // let e = syn::Error::new(
+                        //     l_span,
+                        //     format!("expected 1 or 2 items in metalist, found {}", other),
+                        // );
+                        // Err(e)
                     }
                 }
             }
@@ -675,5 +680,14 @@ mod tests {
                 def.len()
             );
         }
+    }
+
+    #[test]
+    fn test_ident() {
+        let token = quote::quote! { path::to::CONST };
+
+        let expr = syn::parse2::<syn::Path>(token).unwrap();
+
+        println!("{}", expr.to_token_stream());
     }
 }

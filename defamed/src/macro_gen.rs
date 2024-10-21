@@ -40,7 +40,7 @@ impl Display for MacroType {
 ///
 /// This macro generates code that calls the actual function,
 /// while reorderng and substituting parameters as needed.
-pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + Debug>(
+pub fn generate_item_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + Debug>(
     vis: Visibility,
     // package_name: &str,
     item_path: Option<syn::Path>,
@@ -54,16 +54,14 @@ pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + D
         .cloned()
         .expect("at least one match pattern expected");
 
-    let func_path_root = item_path
-        .clone()
-        .map(|g| {
-            if g.is_ident(crate::ROOT_VISIBILITY_IDENT) {
-                quote! {$#g ::}
-            } else {
-                quote! {$crate :: #g ::}
-            }
-        })
-        .unwrap_or_default();
+    let item_path_root = item_path.clone().map(|g| {
+        if g.is_ident(crate::ROOT_VISIBILITY_IDENT) {
+            quote! {$crate ::}
+        } else {
+            quote! {$crate :: #g ::}
+        }
+    });
+    // .unwrap_or_default();
 
     // let package_ident = syn::Ident::new(&package_name.replace("-", "_"), Span::call_site());
 
@@ -71,17 +69,18 @@ pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + D
         .into_iter()
         .map(|p| {
             let macro_signature = create_macro_signature(&p);
-            let func_signature = create_func_call_signature(first_ref.as_slice(), &p);
+            let item_signature =
+                create_func_call_signature(first_ref.as_slice(), &p, item_path_root.clone());
 
             match output {
                 MacroType::Function | MacroType::StructTuple => quote! {
                     (#macro_signature) => {
-                        #func_path_root #item_ident(#func_signature)
+                        #item_path_root #item_ident(#item_signature)
                     }
                 },
                 MacroType::Struct => quote! {
                     (#macro_signature) => {
-                        #func_path_root #item_ident{#func_signature}
+                        #item_path_root #item_ident{#item_signature}
                     }
                 },
             }
@@ -104,11 +103,18 @@ pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + D
         Visibility::Restricted(_) | Visibility::Inherited => quote! {},
     };
 
-    let func_dunder_ident = syn::Ident::new(
+    let item_dunder_ident = syn::Ident::new(
         &format!(
             "__{}{}__",
             match &item_path {
-                Some(p) => format!("{}_", p.to_token_stream()),
+                Some(p) => format!(
+                    "{}_",
+                    p.segments
+                        .iter()
+                        .map(|s| s.ident.to_string())
+                        .collect::<Box<[String]>>()
+                        .join("_")
+                ),
                 None => "".to_string(),
             },
             item_ident.to_token_stream()
@@ -136,7 +142,7 @@ pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + D
             #[doc(hidden)]
             #[allow(unused_macros)]
             #macro_def_attr
-            macro_rules! #func_dunder_ident (
+            macro_rules! #item_dunder_ident (
                 #macro_matches
             );
 
@@ -144,7 +150,7 @@ pub fn generate_func_macro<P: ToMacroPattern + ToDocInfo + Clone + PartialEq + D
             #[doc = concat!("[`defamed`] wrapper for [`", #item_prefix, stringify!(#item_ident), "`]")]
             #[doc = ""]
             #doc_type_info
-            #vis use #func_dunder_ident as #item_ident;
+            #vis use #item_dunder_ident as #item_ident;
 
         // }
         // #vis use #macro_mod::*;
@@ -182,7 +188,11 @@ fn create_macro_signature<P: ToMacroPattern>(params: &[P]) -> pm2::TokenStream {
 /// All elements in `reference` must have an equal (by [PartialEq]) in `params`.
 ///
 /// If there are more elements in `params` than in `reference`, the extra elements are appended to the end.
-fn create_func_call_signature<P>(reference: &[P], params: &[P]) -> pm2::TokenStream
+fn create_func_call_signature<P>(
+    reference: &[P],
+    params: &[P],
+    path_prefix: Option<proc_macro2::TokenStream>,
+) -> pm2::TokenStream
 where
     P: ToMacroPattern + PartialEq + Debug,
 {
@@ -201,7 +211,7 @@ where
                 .find(|item| *item == r)
                 .expect("parameter must exist");
 
-            p.to_func_call_pattern()
+            p.to_func_call_pattern(path_prefix.clone())
         })
         .collect();
 
@@ -214,7 +224,7 @@ where
             // todo!();
             let additional = params[reference.len()..]
                 .iter()
-                .map(|p| p.to_func_call_pattern());
+                .map(|p| p.to_func_call_pattern(path_prefix.clone()));
 
             seq.extend(additional);
         }
